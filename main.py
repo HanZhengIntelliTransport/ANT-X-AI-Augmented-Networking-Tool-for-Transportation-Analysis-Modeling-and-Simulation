@@ -1,4 +1,5 @@
 from Dimension2Network import HighDimNetwork, RuleManager
+from visulizations.graph_output import GraphDrawer
 from visulizations.graph_visualizer import GraphVisualizer
 import webbrowser
 from threading import Timer
@@ -39,13 +40,15 @@ if __name__ == "__main__":
         print(f"{link_id}: {mapping}")
 
     # Visualize the network
-    visualizer = GraphVisualizer(merged_network.graph)
-    app = visualizer.create_dash_app()
-
-    # Run the Dash app
-    print("Initializing the Dash server...")
-    try:
-        Timer(1, open_browser).start()
-        app.run_server(debug=True, port=8050)
-    except Exception as e:
-        print(f"Error starting Dash server: {e}")
+    visualizer = GraphDrawer(merged_network.graph)
+    visualizer.plot_with_matplotlib()
+    if None:
+        visualizer = GraphVisualizer(merged_network.graph)
+        app = visualizer.create_dash_app()
+        # Run the Dash app
+        print("Initializing the Dash server...")
+        try:
+            Timer(1, open_browser).start()
+            app.run_server(debug=True, port=8050)
+        except Exception as e:
+            print(f"Error starting Dash server: {e}")
