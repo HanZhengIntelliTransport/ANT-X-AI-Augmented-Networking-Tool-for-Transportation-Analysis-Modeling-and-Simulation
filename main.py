@@ -1,4 +1,4 @@
-from Dimension2Network import HighDimNetwork, RuleManager
+from Dimension2Network.Dimension2Network import HighDimNetwork, RuleManager
 from visulizations.graph_output import GraphDrawer
 from visulizations.graph_visualizer import GraphVisualizer
 import webbrowser
@@ -7,15 +7,17 @@ from threading import Timer
 def open_browser():
     webbrowser.open_new("http://127.0.0.1:8050/")
 
+
 if __name__ == "__main__":
     # Rule definitions
     rule_manager_xy = RuleManager()
     rule_manager_xy.add_node_rule("rule1", ["X", "Y"], lambda x, y: x + y < 0.6)
-    rule_manager_xy.add_link_rule("rule1", ["Y"], lambda y1, y2: abs(y1 - y2) < 0.2)
+    # rule_manager_xy.add_node_rule("rule1", ["X"], lambda x: x in [1,2,3,4,5])
+    rule_manager_xy.add_link_rule("rule2", ["Y"], lambda y1, y2: abs(y1 - y2) < 0.2)
 
     rule_manager_yz = RuleManager()
-    rule_manager_yz.add_node_rule("rule1", ["Y", "Z"], lambda y, z: y + z < 1.0)
-    rule_manager_yz.add_link_rule("rule1", ["Y"], lambda y1, y2: abs(y1 - y2) < 0.3)
+    rule_manager_yz.add_node_rule("rule3", ["Y", "Z"], lambda y, z: y + z < 1.0)
+    rule_manager_yz.add_link_rule("rule4", ["Y"], lambda y1, y2: abs(y1 - y2) < 0.3)
 
     # Create two networks
     network_xy = HighDimNetwork("XY", 2, ["X", "Y"], ranges=[(0, 1), (0, 1)], steps=[0.1, 0.1], rule_manager=rule_manager_xy)
@@ -41,7 +43,7 @@ if __name__ == "__main__":
 
     # Visualize the network
     visualizer = GraphDrawer(merged_network.graph)
-    visualizer.plot_with_matplotlib()
+    visualizer.plot_with_matplotlib(None)
     if None:
         visualizer = GraphVisualizer(merged_network.graph)
         app = visualizer.create_dash_app()

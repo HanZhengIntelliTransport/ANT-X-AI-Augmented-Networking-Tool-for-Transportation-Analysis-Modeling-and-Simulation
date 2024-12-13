@@ -1,7 +1,12 @@
-from graphs.Graph import Graph, Node, Link
+from Dimension2Network.graph_elements import Graph, Node, Link
+
+class GraphTheoryRule:
+    def __init__(self, graph):
+        print(1)
 
 class RuleManager:
     """Manages rules for nodes and links in the network."""
+    #The input dimensions of each function is the dimension of high-dimensional network
 
     def __init__(self):
         self.node_rules = {}  # {rule_id: (dimensions, rule_function)}
@@ -186,6 +191,43 @@ class HighDimNetwork:
                 print(f"Link Mapping Added: {combined_id} -> {combined_network.link_mapping[combined_id]}")  # Debug
 
         return combined_network
+    def remove_node(self, node_id):
+        """Remove a node and its associated links from the graph."""
+        if node_id not in self.graph.nodes:
+            raise ValueError(f"Node {node_id} does not exist in the graph.")
 
+        # Remove associated links
+        associated_links = [
+            link_id for link_id, link in self.graph.links.items()
+            if link.source == node_id or link.target == node_id
+        ]
+        for link_id in associated_links:
+            self.remove_link(link_id)
+
+        # Remove node from the graph and update mappings
+        del self.graph.nodes[node_id]
+        if node_id in self.node_mapping:
+            del self.node_mapping[node_id]
+
+        print(f"Node {node_id} and its associated links have been removed.")  # Debug
+
+    def remove_link(self, link_id):
+        """Remove a link from the graph."""
+        if link_id not in self.graph.links:
+            raise ValueError(f"Link {link_id} does not exist in the graph.")
+
+        # Remove link from the graph and update mappings
+        del self.graph.links[link_id]
+        if link_id in self.link_mapping:
+            del self.link_mapping[link_id]
+
+        print(f"Link {link_id} has been removed.")  # Debug
+
+    # Add helper functions for debug purposes (optional)
+    def print_graph_summary(self):
+        """Print a summary of the current graph state."""
+        print(f"Graph {self.network_id}:")
+        print(f"  Nodes: {len(self.graph.nodes)}")
+        print(f"  Links: {len(self.graph.links)}")
     def __repr__(self):
         return f"HighDimNetwork(network_id={self.network_id}, nodes={len(self.graph.nodes)}, links={len(self.graph.links)})"
