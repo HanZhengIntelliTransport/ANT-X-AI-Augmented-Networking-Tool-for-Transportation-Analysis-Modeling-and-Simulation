@@ -69,12 +69,17 @@ class GraphDrawer:
         for link in projected_links:
             source_coords = link["source"]["coordinates"]
             target_coords = link["target"]["coordinates"]
-            ax.plot(
-                [source_coords[dim_x.dim_id], target_coords[dim_x.dim_id]],
-                [source_coords[dim_y.dim_id], target_coords[dim_y.dim_id]],
-                color='gray', linestyle='-', linewidth=1, alpha=0.7
+            ax.annotate(
+                "",  # No text
+                xy=(target_coords[dim_x.dim_id], target_coords[dim_y.dim_id]),  # End of arrow
+                xytext=(source_coords[dim_x.dim_id], source_coords[dim_y.dim_id]),  # Start of arrow
+                arrowprops=dict(
+                    arrowstyle="->",  # Style of arrow (simple arrow)
+                    color="gray",  # Arrow color
+                    linewidth=1,  # Arrow line width
+                    alpha=0.7  # Transparency
+                )
             )
-
         # Set axis labels
         ax.set_xlabel(f"Dimension {dim_x.dim_id}", fontsize=12)
         ax.set_ylabel(f"Dimension {dim_y.dim_id}", fontsize=12)
