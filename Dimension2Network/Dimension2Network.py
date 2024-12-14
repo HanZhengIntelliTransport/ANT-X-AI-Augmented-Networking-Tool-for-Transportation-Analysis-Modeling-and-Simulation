@@ -1,110 +1,296 @@
 from Dimension2Network.graph_elements import Graph, Node, Link
+import inspect
+from typing import Dict, List
 
-class GraphTheoryRule:
-    def __init__(self, graph):
-        print(1)
+class Dimension:
+    """Represents a single dimension with logical values, corresponding coordinates, and attributes."""
 
-class RuleManager:
-    """Manages rules for nodes and links in the network."""
-    #The input dimensions of each function is the dimension of high-dimensional network
+    def __init__(self, dim_id, values, attributes=None, start=0, step=1):
+        """
+        Initialize a Dimension.
+        :param dim_id: str, id of the dimension (e.g., "state").
+        :param values: List[str], list of logical values this dimension can take (e.g., ["A", "B", "C"]).
+        :param attributes: Optional[Dict[str, Dict[str, Any]]], a dictionary mapping each value in `values`
+                           to another dictionary of attributes.
+                           - Key: str, a value in `values`.
+                           - Value: Dict[str, Any], a dictionary where:
+                               - Key: Attribute name (e.g., "color", "weight").
+                               - Value: Attribute value (e.g., "red", 1.5).
+                           Example:
+                               attributes={
+                                   "A": {"color": "red", "weight": 1.0},
+                                   "B": {"color": "blue", "weight": 1.5},
+                                   "C": {"color": "green", "weight": 2.0},
+                               }
+        :param start: int or float, the starting coordinate for visualization.
+        :param step: int or float, the step size for generating coordinates between consecutive values.
+        """
+        self.dim_id = dim_id
+        self.values = values
+        self.attributes = attributes or {value: {} for value in values}  # Default attributes as empty dicts
+        self.coordinates = self._generate_coordinates(start, step)
 
-    def __init__(self):
-        self.node_rules = {}  # {rule_id: (dimensions, rule_function)}
-        self.link_rules = {}  # {rule_id: (dimensions, rule_function)}
+        # Ensure attributes match values
+        if set(self.values) != set(self.attributes.keys()):
+            raise ValueError("Attributes keys must match the dimension values.")
 
-    def add_node_rule(self, rule_id, dimensions, rule_function):
-        """Add a node rule."""
-        self.node_rules[rule_id] = (dimensions, rule_function)
+    def _generate_coordinates(self, start, step):
+        """
+        Generate a mapping of each value to a unique coordinate based on its position in `values`.
+        :param start: Starting coordinate for the first value.
+        :param step: Step size between consecutive coordinates.
+        :return: Dict[str, float], a dictionary mapping each value in `values` to a coordinate.
+        """
+        return {value: start + i * step for i, value in enumerate(self.values)}
 
-    def add_link_rule(self, rule_id, dimensions, rule_function):
-        """Add a link rule."""
-        self.link_rules[rule_id] = (dimensions, rule_function)
+    def validate_value(self, value):
+        """
+        Validate if a given value is valid for this dimension.
+        :param value: str, the value to validate.
+        :return: bool, True if the value is valid, otherwise False.
+        """
+        return value in self.values
 
-    def validate_node(self, dimensions, coordinates):
-        """Validate a node against all node rules."""
-        for rule_id, (rule_dims, rule_func) in self.node_rules.items():
-            if not all(dim in dimensions for dim in rule_dims):
-                continue
-            indices = [dimensions.index(dim) for dim in rule_dims]
-            values = [coordinates[idx] for idx in indices]
-            if not rule_func(*values):
-                return False
-        return True
+    def get_coordinate(self, value):
+        """
+        Retrieve the coordinate corresponding to a logical value.
+        :param value: str, a value in `values`.
+        :return: float, the coordinate associated with the given value.
+        :raises ValueError: If the value is not valid for this dimension.
+        """
+        if value not in self.coordinates:
+            raise ValueError(f"Value '{value}' not valid for dimension '{self.dim_id}'.")
+        return self.coordinates[value]
 
-    def validate_link(self, dimensions, coords1, coords2):
-        """Validate a link against all link rules."""
-        for rule_id, (rule_dims, rule_func) in self.link_rules.items():
-            if not all(dim in dimensions for dim in rule_dims):
-                continue
-            indices = [dimensions.index(dim) for dim in rule_dims]
-            values1 = [coords1[idx] for idx in indices]
-            values2 = [coords2[idx] for idx in indices]
+    def get_attribute(self, value, attribute_name):
+        """
+        Retrieve a specific attribute for a given value in this dimension.
+        :param value: str, the value for which to retrieve the attribute.
+        :param attribute_name: str, the name of the attribute to retrieve.
+        :return: Any, the value of the requested attribute.
+        :raises ValueError: If the value is not valid for this dimension.
+        :raises KeyError: If the attribute does not exist for the given value.
+        """
+        if value not in self.attributes:
+            raise ValueError(f"Value '{value}' not valid for dimension '{self.dim_id}'.")
+        if attribute_name not in self.attributes[value]:
+            raise KeyError(f"Attribute '{attribute_name}' not found for value '{value}'.")
+        return self.attributes[value][attribute_name]
 
-            # Flatten lists if there's only one dimension
-            if len(values1) == 1 and len(values2) == 1:
-                values1 = values1[0]
-                values2 = values2[0]
+    def set_attribute(self, value, attribute_name, attribute_value):
+        """
+        Set or update a specific attribute for a given value in this dimension.
+        :param value: str, the value for which to set or update the attribute.
+        :param attribute_name: str, the name of the attribute to set or update.
+        :param attribute_value: Any, the value to assign to the attribute.
+        :raises ValueError: If the value is not valid for this dimension.
+        """
+        if value not in self.attributes:
+            raise ValueError(f"Value '{value}' not valid for dimension '{self.dim_id}'.")
+        self.attributes[value][attribute_name] = attribute_value
 
-            if not rule_func(values1, values2):
-                return False
-        return True
+    def __repr__(self):
+        """
+        Return a string representation of the Dimension, including its name, values,
+        coordinates, and attributes for debugging or display purposes.
+        """
+        return (f"Dimension(name={self.dim_id}, values={self.values}, "
+                f"coordinates={self.coordinates}, attributes={self.attributes})")
+
+
+class Rule:
+    """Represents a single subrule with specific dimensions and a validation function."""
+
+    def __init__(self, dimensions, rule_function):
+        """
+        Initialize a SubRule.
+        :param dimensions: Dimensions the subrule applies to.
+        :param rule_function: Validation function for the subrule.
+        """
+        self.dimensions = dimensions
+        self.rule_function = rule_function
+
+    def validate(self, dimensions_id_list, dim_values_Dic_1, dim_values_Dic_2):
+        """
+        Validate this subrule.
+        :param dimensions_id_list: List of all dimension IDs in the current context.
+        :param dim_values_Dic_1: Dictionary of dimension values for the source node.
+        :param dim_values_Dic_2: Dictionary of dimension values for the target node.
+        :return: True if the subrule passes, False otherwise.
+        """
+        # Ensure all dimensions required by this rule are present in dimensions_id_list
+        if not all(dim in dimensions_id_list for dim in self.dimensions):
+            return False
+
+        # Extract the values of the relevant dimensions (e.g., "Y") from both source and target nodes
+        relevant_source_values = [dim_values_Dic_1[dim] for dim in self.dimensions]
+        relevant_target_values = [dim_values_Dic_2[dim] for dim in self.dimensions]
+
+        # Pass the extracted values to the rule function
+        return self.rule_function(*relevant_source_values, *relevant_target_values)
+
+    def __str__(self):
+        """Return a string representation of the SubRule."""
+        try:
+            # Get the source code of the rule_function if available
+            func_code = inspect.getsource(self.rule_function).strip()
+        except (TypeError, OSError):
+            # Fallback to function name and memory location if source code is unavailable
+            func_code = f"{self.rule_function.__name__} at {hex(id(self.rule_function))}"
+
+        return f"SubRule(Dimensions: {self.dimensions}, Function: {func_code})"
+
+
+class NetworkRule:
+    """Represents a composite rule consisting of multiple subrules."""
+
+    def __init__(self, rule_id, dimensions):
+        """
+        Initialize a Rule.
+        :param rule_id: Unique identifier for the rule.
+        :param dimensions: Dimensions applicable to this rule.
+        """
+        self.rule_id = rule_id
+        self.dimensions = dimensions  # List of dimensions this rule applies to
+        self.rules:List[Rule] = []  # List of SubRule instances
+
+    def add_subrule(self, rule):
+        """
+        Add a subrule to this rule.
+        :param rule: An instance of SubRule.
+        :raises ValueError: If the SubRule's dimensions are not a subset of the Rule's dimensions.
+        """
+        # Check if all dimensions of the SubRule are within the Rule's dimensions
+        if not all(dim in self.dimensions for dim in rule.dimensions):
+            raise ValueError(
+                f"SubRule dimensions {rule.dimensions} are not a subset of Rule dimensions {self.dimensions}."
+            )
+        self.rules.append(rule)
+
+    def validate(self, dimensions_id_list, dim_values_Dic_1, dim_values_Dic_2):
+        """
+        Validate this rule by evaluating all its subrules.
+        :param dimensions_id_list: List of all dimension ids in the current context.
+        :param values: List of corresponding coordinate values.
+        :return: True if any subrule passes, False otherwise (OR relationship).
+        """
+        return any(rule.validate(dimensions_id_list, dim_values_Dic_1, dim_values_Dic_2) for rule in self.rules)
+
+
+class NetworkRuleManager:
+    """Manages multiple rules for nodes and links."""
+
+    def __init__(self, manager_id):
+        """
+        Initialize the RuleManager.
+        :param manager_id: Unique identifier for this manager.
+        """
+        self.manager_id = manager_id
+        self.link_rules: Dict[str, NetworkRule] = {}  # {rule_id: Rule instance}
+
+
+    def add_link_rule(self, rule:NetworkRule):
+        """
+        Add a link rule.
+        :param rule: An instance of Rule.
+        """
+        if rule.rule_id in self.link_rules:
+            raise ValueError(f"Link rule with ID '{rule.rule_id}' already exists.")
+        self.link_rules[rule.rule_id] = rule
+
+    def validate_link(self, dimensions_id_list, dim_values_Dic_1, dim_values_Dic_2):
+        """
+        Validate a link by evaluating all link rules.
+        :return: True if all rule passes, False otherwise (and relationship).
+        """
+        return all(rule.validate(dimensions_id_list, dim_values_Dic_1 , dim_values_Dic_2) for rule in self.link_rules.values())
+
+    def list_rules(self):
+        """
+        List all rules managed by this manager with detailed subrule information.
+        """
+        print(f"Rules for RuleManager '{self.manager_id}':")
+
+        for rule_id, rule in self.link_rules.items():
+            print(f"  {rule_id}: {len(rule.rules)} subrule(s)")
+            for idx, subrule in enumerate(rule.rules, start=1):
+                print(f"    SubRule {idx}: {str(subrule)}")
+
 
 
 class HighDimNetwork:
     """A network supporting high-dimensional nodes, links, and traceable dimensions."""
 
-    def __init__(self, network_id, dimension, dimension_ids=None, scales=None, ranges=None, steps=None, rule_manager=None):
+    def __init__(self, network_id, dimension_list:[], rule_manager=None):
         self.network_id = network_id
-        self.dimension = dimension
-        self.graph = Graph(network_id)
+        self.dimension_list = dimension_list
         self.node_mapping = {}
         self.link_mapping = {}
-        self.rule_manager = rule_manager or RuleManager()
-
-        # Validate and set metadata
-        if dimension_ids and len(dimension_ids) != dimension:
-            raise ValueError("The number of dimension IDs must match the dimensionality.")
-        self.dimension_metadata = dimension_ids or [f"dim_{i}" for i in range(dimension)]
-        self.scales = scales or [None] * dimension
-        self.ranges = ranges or [(None, None)] * dimension
-        self.steps = steps or [0.1] * dimension
-
-        if len(self.scales) != dimension or len(self.ranges) != dimension or len(self.steps) != dimension:
-            raise ValueError("Scales, ranges, and steps must match the dimensionality.")
+        self.rule_manager = rule_manager or NetworkRuleManager()
+        self.dimension_id_list = [i.dim_id for i in dimension_list]
+        self.graph = Graph(network_id,self.dimension_id_list)
 
     def construct_nodes(self):
-        """Construct nodes based on ranges, steps, and rules."""
+        """
+        Construct nodes by enumerating all possible combinations of dimension values.
+        Each dimension in `dimension_list` contributes its values to the Cartesian product.
+        """
         import itertools
 
-        # Generate combinations of dimension values
-        value_ranges = [
-            [round(i, 10) for i in self._frange(rng[0], rng[1], step)] if rng[0] is not None and rng[1] is not None else []
-            for rng, step in zip(self.ranges, self.steps)
-        ]
-        for coordinates in itertools.product(*value_ranges):
-            node_id = "_".join(map(str, coordinates))
-            if self.rule_manager.validate_node(self.dimension_metadata, coordinates):
-                self.add_node(node_id, coordinates)
+        # Ensure that dimensions have unique IDs
+        dim_list = [dim.dim_id for dim in self.dimension_list]
 
-    def construct_links(self):
+        # Generate all possible combinations of dimension values
+        value_ranges = [dim.values for dim in self.dimension_list]
+        for combination in itertools.product(*value_ranges):
+            # Create a dictionary for dim_values_dic with dimension_id as key and value from combination
+            dim_values_dic = {dim_id: value for dim_id, value in zip(dim_list, combination)}
+
+            # Create a dictionary for coordinates_dic with dimension_id as key and coordinate value
+            coordinates_dic = {dim.dim_id: dim.get_coordinate(value) for dim, value in
+                               zip(self.dimension_list, combination)}
+
+            # Generate a unique node ID by joining dimension values (for human-readable purposes)
+            node_id = "_".join(map(str, combination))
+
+            # Create an optional attributes dictionary (if needed, extend this with relevant attributes)
+            attributes = {
+                "node_type": "default",  # Example attribute, can be replaced or extended
+                "dimension_count": len(dim_list),  # Number of dimensions for this node
+            }
+
+            # Add the node to the graph using the new Node structure
+            self.add_node(node_id, dim_list, dim_values_dic, coordinates_dic, attributes)
+
+        print(f"Constructed {len(self.graph.nodes)} nodes.")  # Debug: number of nodes constructed
+
+    def construct_links(self):# node loop for a pair of nodes for default
         """Construct links between nodes based on link rules."""
         node_ids = list(self.graph.nodes.keys())
-        for i, source_id in enumerate(node_ids):
+        node_id_range=enumerate(node_ids)
+        for i, source_id in node_id_range:
             for target_id in node_ids[i + 1:]:
-                coords1 = self.graph.nodes[source_id].coordinates
-                coords2 = self.graph.nodes[target_id].coordinates
-                if self.rule_manager.validate_link(self.dimension_metadata, coords1, coords2):
+                if source_id == target_id:
+                    continue
+                dim_values_dic_1 = self.graph.nodes[source_id].dim_values_dic
+                dim_values_dic_2 = self.graph.nodes[target_id].dim_values_dic
+                if self.rule_manager.validate_link(self.dimension_id_list, dim_values_dic_1, dim_values_dic_2):
                     self.add_link(source_id, target_id)
 
-    def _frange(self, start, stop, step):
-        """Helper function for generating floating-point ranges."""
-        while start < stop:
-            yield round(start, 10)
-            start += step
+    def construct_network(self):
+        """Construct network."""
+        self.construct_nodes()
+        self.construct_links()
 
-    def add_node(self, node_id, coordinates, attributes=None):
+    # def _frange(self, start, stop, step):
+    #     """Helper function for generating floating-point ranges."""
+    #     while start < stop:
+    #         yield round(start, 10)
+    #         start += step
+
+    def add_node(self, node_id, dim_list, dim_values_dic, coordinates_dic, attributes=None):
         """Add a node to the graph."""
-        self.graph.add_node(Node(node_id, coordinates, attributes))
+        self.graph.add_node(Node(node_id, dim_list, dim_values_dic, coordinates_dic, attributes))
 
     def add_link(self, source_id, target_id, link_id=None, attributes=None):
         """Add a link to the graph."""
@@ -113,8 +299,7 @@ class HighDimNetwork:
 
     def merge_networks(self, other_network, merge_dimensions):
         """
-        Merge two networks into a higher-dimensional network.
-
+        Merge dimensions and link rules from two networks, then regenerate the merged network.
         :param other_network: The other HighDimNetwork instance to merge with.
         :param merge_dimensions: List of shared dimensions to merge on.
         :return: A new HighDimNetwork instance representing the merged network.
@@ -122,73 +307,34 @@ class HighDimNetwork:
         # Validate shared dimensions
         shared_dims = [
             dim for dim in merge_dimensions
-            if dim in self.dimension_metadata and dim in other_network.dimension_metadata
+            if dim in self.dimension_id_list and dim in other_network.dimension_id_list
         ]
         if not shared_dims:
             raise ValueError("No shared dimensions found for merging.")
 
-        # Prepare new metadata, scales, and ranges for the merged network
-        new_metadata = list(set(self.dimension_metadata + other_network.dimension_metadata))
-        combined_scales = [None] * len(new_metadata)
-        combined_ranges = [(None, None)] * len(new_metadata)
+        # Combine dimensions from both networks
+        merged_dimension_list = list({
+                                         dim.dim_id: dim for dim in (self.dimension_list + other_network.dimension_list)
+                                     }.values())
 
-        # Copy scales and ranges for the first network
-        for dim in self.dimension_metadata:
-            idx = new_metadata.index(dim)
-            combined_scales[idx] = self.scales[self.dimension_metadata.index(dim)]
-            combined_ranges[idx] = self.ranges[self.dimension_metadata.index(dim)]
+        # Merge link rules from both networks
+        combined_rule_manager = NetworkRuleManager(f"{self.network_id}_{other_network.network_id}_rules")
+        for rule_id, rule in self.rule_manager.link_rules.items():
+            if rule_id not in combined_rule_manager.link_rules:
+                combined_rule_manager.add_link_rule(rule)
+        for rule_id, rule in other_network.rule_manager.link_rules.items():
+            if rule_id not in combined_rule_manager.link_rules:
+                combined_rule_manager.add_link_rule(rule)
 
-        # Copy scales and ranges for the second network
-        for dim in other_network.dimension_metadata:
-            idx = new_metadata.index(dim)
-            combined_scales[idx] = other_network.scales[other_network.dimension_metadata.index(dim)]
-            combined_ranges[idx] = other_network.ranges[other_network.dimension_metadata.index(dim)]
-
-        # Combine rule managers
-        combined_rule_manager = RuleManager()
-        combined_rule_manager.node_rules.update(self.rule_manager.node_rules)
-        combined_rule_manager.node_rules.update(other_network.rule_manager.node_rules)
-        combined_rule_manager.link_rules.update(self.rule_manager.link_rules)
-        combined_rule_manager.link_rules.update(other_network.rule_manager.link_rules)
-
-        # Initialize the merged network
+        # Initialize the merged network with combined dimensions and rules
         combined_network = HighDimNetwork(
             network_id=f"{self.network_id}_{other_network.network_id}",
-            dimension=len(new_metadata),
-            dimension_ids=new_metadata,
-            scales=combined_scales,
-            ranges=combined_ranges,
-            rule_manager=combined_rule_manager,
+            dimension_list=merged_dimension_list,
+            rule_manager=combined_rule_manager
         )
 
-        # Merge nodes
-        for node1_id, data1 in self.graph.nodes.items():
-            for node2_id, data2 in other_network.graph.nodes.items():
-                combined_coords = [
-                    data1.coordinates[self.dimension_metadata.index(dim)] if dim in self.dimension_metadata else
-                    data2.coordinates[other_network.dimension_metadata.index(dim)]
-                    for dim in new_metadata
-                ]
-                combined_id = f"{node1_id}_{node2_id}"
-                combined_network.add_node(combined_id, tuple(combined_coords))
-                combined_network.node_mapping[combined_id] = {
-                    self.network_id: node1_id,
-                    other_network.network_id: node2_id,
-                }
-                print(f"Node Mapping Added: {combined_id} -> {combined_network.node_mapping[combined_id]}")  # Debug
-
-        # Merge links
-        for link1 in self.graph.links:
-            for link2 in other_network.graph.links:
-                combined_source = f"{link1.source}_{link2.source}"
-                combined_target = f"{link1.target}_{link2.target}"
-                combined_id = f"{link1.link_id}_{link2.link_id}"
-                combined_network.add_link(combined_source, combined_target)
-                combined_network.link_mapping[combined_id] = {
-                    self.network_id: (link1.source, link1.target),
-                    other_network.network_id: (link2.source, link2.target),
-                }
-                print(f"Link Mapping Added: {combined_id} -> {combined_network.link_mapping[combined_id]}")  # Debug
+        # Regenerate nodes and links for the merged network
+        combined_network.construct_network()
 
         return combined_network
     def remove_node(self, node_id):
